@@ -59,6 +59,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  disableDeselect: {
+    type: Boolean,
+    default: false
+  },
   renderNode: Function as PropType<RenderNodeFunc>,
   renderIcon: Function as PropType<RenderIconFunc>,
   loadData: Function as PropType<LoadDataFunc>,
@@ -196,8 +200,10 @@ function lazyLoad(node: BaseTreeNode, children: TreeNodeOptions[]) {
 
 const selectedKeys = ref(new Set<NodeKey>());
 watch(() => props.defaultSelectedKey, newVal => {
-  selectedKeys.value.clear();
-  selectedKeys.value.add(newVal);
+  const newSelectedNode = key2TreeNode.value?.[newVal];
+  if (newSelectedNode) {
+    selectChange(newSelectedNode, false);
+  }
 }, {
   immediate: true
 });
@@ -219,9 +225,9 @@ function onFocusOut() {
 }
 
 function onFocusIn() {
-  if (!focusKey.value) {
-    focusChange(flattenTreeData.value?.at(0));
-  }
+  const focusNode = focusKey.value ? key2TreeNode.value[focusKey.value] : null;
+  // either the selected the prev focused or the first one get focus
+  focusChange(selectedNode.value ?? focusNode ?? flattenTreeData.value?.at(0));
 }
 
 function handleKeyboardNavigation(event: KeyboardEvent) {
@@ -289,10 +295,10 @@ function handleKeyboardNavigation(event: KeyboardEvent) {
   emit("keydown", { event, node: currentFocusedNode });
 }
 
-function selectChange(node: BaseTreeNode) {
+function selectChange(node: BaseTreeNode, deselect: boolean = true) {
   const preSelectedNode = key2TreeNode.value[Array.from(selectedKeys.value.values())[0]];
   let currentNode: TypeWithUndefined<BaseTreeNode>;
-  if (selectedKeys.value.has(node.key)) {
+  if (selectedKeys.value.has(node.key) && deselect && !props.disableDeselect) {
     selectedKeys.value.clear();
   } else {
     selectedKeys.value.clear();
@@ -300,6 +306,7 @@ function selectChange(node: BaseTreeNode) {
     currentNode = node;
   }
   emit('selectChange', { preSelectedNode, node: currentNode });
+  focusChange(node);
 }
 
 function checkChange(node: BaseTreeNode) {
